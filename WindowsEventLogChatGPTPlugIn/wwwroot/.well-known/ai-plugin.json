@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Windows Event Log Plugin",
+  "name_for_model": "eventlog",
+  "description_for_human": "This plugin allows you to interact with the Windows Event Log.",
+  "description_for_model": "This API allows you to interact with the Windows Event Log. You can retrieve specific events using the XPath query language. Example 1: Retrieve all Error events from the System log by sending a GET request to 'http://localhost:5000/events?logName=System&query=*[System[(Level=2) and (Logfile='System')]]'. Example 2: Retrieve all Warning and Error events from the last 24 hours by sending a GET request to 'http://localhost:5000/events?logName=System&query=*[System[(Level<=2) and (TimeCreated[timediff(@SystemTime) <= 86400000])]]'. Example 3: Retrieve all events from the Application log by sending a GET request to 'http://localhost:5000/events?logName=Application&query=*[System[(Logfile='Application')]]'. Remember to replace 'http://localhost:5000' with the actual base URL of your API if it's hosted somewhere else.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "http://localhost:5000/swagger/v1/swagger.yaml"
+  },
+  "logo_url": "http://localhost:5000/logo.png",
+  "contact_email": "support@yourdomain.com",
+  "legal_info_url": "https://www.yourdomain.com/legal"
+}
