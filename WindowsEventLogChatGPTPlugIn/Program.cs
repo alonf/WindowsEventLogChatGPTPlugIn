@@ -4,7 +4,12 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
 using YamlDotNet.Serialization;
 using System.Xml;
+using Microsoft.OpenApi.Any;
 using Newtonsoft.Json;
+
+const int maxGptTokens = 4096;
+char[] delimiters = { ' ', '.', ',', ';', '!', '?', '<', '>', ':', '\'', '\"', '\n', '\t' }; // Add more delimiters as needed
+
 
 var argsWithUrls = new[] { "--urls", "http://localhost:5000" }.Concat(args).ToArray();
 
@@ -48,8 +53,18 @@ if (app.Environment.IsDevelopment())
 
 
 
-app.MapGet("/events", (string logName, string query) =>
+app.MapGet("/events", (string logName, string query, int? pageSize, int? pageNumber) =>
     {
+        if (pageSize is null or < 1)
+            pageSize = 5;
+        
+        if (pageNumber is null or < 1)
+            pageNumber = 1;
+
+        int actualPageSize = pageSize.Value;
+        int actualPageNumber = pageNumber.Value;
+
+
         try
         {
             //validate log name
@@ -65,27 +80,47 @@ app.MapGet("/events", (string logName, string query) =>
                     return Results.BadRequest("Invalid log name");
             }
 
+            long offset = actualPageSize * (actualPageNumber - 1);
+
             // Create an EventLogQuery instance.
-            var eventsQuery = new EventLogQuery("Application", PathType.LogName, query);
+            var eventsQuery = new EventLogQuery(logName, PathType.LogName, query);
 
             // Create an EventLogReader instance.
             var logReader = new EventLogReader(eventsQuery);
 
-            // Read the events in the log.
-            var events = new List<EventEntry>();
+            // Seek to the offset
+            logReader.Seek(SeekOrigin.Begin, offset);
 
-            int nEvents = 0;
-            while (logReader.ReadEvent() is { } record)
+            // Read the events
+            var queryResult = new EventQueryResult()
             {
-                events.Add(new EventEntry {Id = record.Id, Json =ConvertXmlToJson(record.ToXml())});
-                if (++nEvents >= 5)
+                PageNumber = actualPageNumber,
+                PageSize = actualPageSize,
+                HasMore = true,
+                HasPageSizeTruncated = false
+            };
+
+            for (int i = 0; i < pageSize; i++)
+            {
+                EventRecord record = logReader.ReadEvent();
+                if (record == null)
                 {
+                    queryResult.HasMore = false;
+                    break;
+                }
+                queryResult.Events.Add(new EventEntry { Id = record.Id, Json = ConvertXmlToJson(record.ToXml()) });
+
+                if (GetResultEstimationTokenCount(queryResult.Events) > maxGptTokens)
+                {
+                    queryResult.Events.RemoveAt(queryResult.Events.Count - 1);
+                    queryResult.PageSize = i;
+                    queryResult.HasPageSizeTruncated = true;
                     break;
                 }
             }
 
             // Return the events.
-            return Results.Ok(events);
+            return Results.Ok(queryResult);
         }
         catch (Exception ex)
         {
@@ -118,8 +153,25 @@ app.MapGet("/events", (string logName, string query) =>
             Description = "valid XPath query for the Windows event log",
             Schema = new OpenApiSchema { Type = "string" }
         });
+        operation.Parameters.Add(new OpenApiParameter
+        {
+            Name = "pageSize",
+            In = ParameterLocation.Query,
+            Required = false,
+            Description = "Number of events to return",
+            Schema = new OpenApiSchema { Type = "integer", Default = new OpenApiInteger(5) }
+        });
+        operation.Parameters.Add(new OpenApiParameter
+        {
+            Name = "pageNumber",
+            In = ParameterLocation.Query,
+            Required = false,
+            Description = "Page number of events to return",
+            Schema = new OpenApiSchema { Type = "integer", Default = new OpenApiInteger(1) }
+        });
+
         return operation;
-    }).Produces<List<EventEntry>>();
+    }).Produces<EventQueryResult>();
 
 app.MapGet("/swagger/v1/swagger.yaml", (ISwaggerProvider swaggerProvider) =>
 {
@@ -140,8 +192,24 @@ string ConvertXmlToJson(string xml)
     string json = JsonConvert.SerializeXmlNode(doc);
     return json;
 }
+
+int GetResultEstimationTokenCount(IList<EventEntry> events)
+{
+    var count = events.Sum(e=>e.Json.Count(c => delimiters.Contains(c)) + 20); //20 for additional information tokens for each entry
+    return (int)(count * 1.4); //factor the fact that some tokens are longer than 1 character
+}
+
 public record EventEntry
 {
     public int Id { get; set; }
     public string Json { get; init; } = "";
+}
+
+public record EventQueryResult
+{
+    public List<EventEntry> Events { get; init; } = new List<EventEntry>();
+    public bool HasMore { get; set; }
+    public int PageNumber { get; init; }
+    public bool HasPageSizeTruncated { get; set; }
+    public int PageSize { get; set; }
 }

@@ -10,7 +10,8 @@ The Windows Event Log plugin provides an API that can retrieve specific events f
 
 - Retrieve specific events from the Windows Event Log using XPath queries.
 - Supports all major log names: Application, Security, Setup, System, and ForwardedEvents.
-- Use it to solve problems and get information about your Windows system status
+- Use it to solve problems and get information about your Windows system status.
+- The plugin supports paging. It estimate the number of tokens and limit the result.
 
 ## Getting Started
 
