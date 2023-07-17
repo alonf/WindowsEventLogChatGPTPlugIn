@@ -28,18 +28,7 @@ app.UseCors(policy =>
         .AllowAnyMethod() // Allow all HTTP methods
         .AllowAnyHeader()); // Allow all headers
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    ContentTypeProvider = new FileExtensionContentTypeProvider(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        // Add mappings for .yaml
-        [".yaml"] = "application/x-yaml",
-        [".yml"] = "application/x-yaml",
-        [".json"] = "application/json",
-        [".png"] = "application/png"
-    })
-});
-
+app.UseStaticFiles();
 app.UseSwagger();
 
 // Configure the HTTP request pipeline.
@@ -49,8 +38,6 @@ if (app.Environment.IsDevelopment())
 }
 
 //app.UseHttpsRedirection();
-
-
 
 
 app.MapGet("/events", (string logName, string query, int? pageSize, int? pageNumber) =>
@@ -207,7 +194,7 @@ public record EventEntry
 
 public record EventQueryResult
 {
-    public List<EventEntry> Events { get; init; } = new List<EventEntry>();
+    public List<EventEntry> Events { get; init; } = new();
     public bool HasMore { get; set; }
     public int PageNumber { get; init; }
     public bool HasPageSizeTruncated { get; set; }
