@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.StaticFiles;
 using System.Diagnostics.Eventing.Reader;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
