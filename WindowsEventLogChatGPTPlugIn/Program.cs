@@ -8,7 +8,7 @@ using Microsoft.OpenApi.Any;
 using Newtonsoft.Json;
 
 const int maxGptTokens = 4096;
-char[] delimiters = { ' ', '.', ',', ';', '!', '?', '<', '>', ':', '\'', '\"', '\n', '\t' }; // Add more delimiters as needed
+char[] delimiters = { ' ', '.', ',', ';', '!', '?', '<', '>', ':', '\'', '\"', '\n', '\t' }; 
 
 
 var argsWithUrls = new[] { "--urls", "http://localhost:5000" }.Concat(args).ToArray();
@@ -183,7 +183,7 @@ string ConvertXmlToJson(string xml)
 int GetResultEstimationTokenCount(IList<EventEntry> events)
 {
     var count = events.Sum(e=>e.Json.Count(c => delimiters.Contains(c)) + 20); //20 for additional information tokens for each entry
-    return (int)(count * 1.4); //factor the fact that some tokens are longer than 1 character
+    return (int)(count * 1.4); //factor the fact that some words are more than a single token
 }
 
 public record EventEntry
