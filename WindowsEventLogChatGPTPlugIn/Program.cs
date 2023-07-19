@@ -7,7 +7,6 @@ using Newtonsoft.Json;
 using WindowsEventLogChatGPTPlugIn;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
-using Formatting = Newtonsoft.Json.Formatting;
 
 const int maxGptTokens = 4096;
 char[] delimiters = { ' ', '.', ',', ';', '!', '?', '<', '>', ':', '\'', '\"', '\n', '\t' }; 
