@@ -2,9 +2,13 @@ using System.Diagnostics.Eventing.Reader;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
 using YamlDotNet.Serialization;
-using System.Xml;
 using Microsoft.OpenApi.Any;
 using Newtonsoft.Json;
+using WindowsEventLogChatGPTPlugIn;
+using System.Text.Json.Nodes;
+using System.Xml;
+using System.Xml.Linq;
+using Formatting = Newtonsoft.Json.Formatting;
 
 const int maxGptTokens = 4096;
 char[] delimiters = { ' ', '.', ',', ';', '!', '?', '<', '>', ':', '\'', '\"', '\n', '\t' }; 
@@ -16,6 +20,7 @@ var builder = WebApplication.CreateBuilder(argsWithUrls);
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddCors();
@@ -94,7 +99,7 @@ app.MapGet("/events", (string logName, string query, int? pageSize, int? pageNum
                     queryResult.HasMore = false;
                     break;
                 }
-                queryResult.Events.Add(new EventEntry { Id = record.Id, Json = ConvertXmlToJson(record.ToXml()) });
+                queryResult.Events.Add(new EventEntry { Id = record.Id, Info = ConvertXmlToJson(record.ToXml()) });
 
                 if (GetResultEstimationTokenCount(queryResult.Events) > maxGptTokens)
                 {
@@ -171,31 +176,52 @@ app.MapGet("/swagger/v1/swagger.yaml", (ISwaggerProvider swaggerProvider) =>
 
 app.Run();
 
-string ConvertXmlToJson(string xml)
+JsonNode ConvertXmlToJson(string xml)
 {
-    XmlDocument doc = new XmlDocument();
-    doc.LoadXml(xml);
-    string json = JsonConvert.SerializeXmlNode(doc);
-    return json;
+    // Parse the XML string into an XDocument
+    XDocument doc = XDocument.Parse(xml);
+
+    // Remove the xmlns attribute
+    var noNsXml = RemoveAllNamespaces(doc.Root);
+
+    // Remove the Correlation element if it is null
+    var correlationElement = noNsXml.Descendants("Correlation").FirstOrDefault();
+    if (correlationElement != null && string.IsNullOrEmpty(correlationElement.Value))
+    {
+        correlationElement.Remove();
+    }
+
+    //we use Newtonsoft.Json to convert the XDocument to JSON
+    var jsonText = JsonConvert.SerializeXNode(noNsXml, Formatting.None, true);
+    var cleanText = jsonText.Replace("@", "").Replace("#text", "text"); //remove the @ from the attribute names, and # from text
+    //we use System.Text.Json to parse the JSON string into a JsonNode
+    var json = JsonNode.Parse(cleanText);
+    return json ?? new JsonObject();
 }
 
 int GetResultEstimationTokenCount(IList<EventEntry> events)
 {
-    var count = events.Sum(e=>e.Json.Count(c => delimiters.Contains(c)) + 20); //20 for additional information tokens for each entry
+    var count = events.Sum(e=>e.Info.ToString().Count(c => delimiters.Contains(c)) + 20); //20 for additional information tokens for each entry
     return (int)(count * 1.4); //factor the fact that some words are more than a single token
 }
 
-public record EventEntry
+XElement RemoveAllNamespaces(XElement? xmlDocument)
 {
-    public int Id { get; set; }
-    public string Json { get; init; } = "";
+    if (xmlDocument == null)
+        return new XElement("null");
+
+    if (!xmlDocument.HasElements)
+    {
+        XElement xElement = new XElement(xmlDocument.Name.LocalName)
+        {
+            Value = xmlDocument.Value
+        };
+
+        foreach (XAttribute attribute in xmlDocument.Attributes())
+            xElement.Add(attribute);
+
+        return xElement;
+    }
+    return new XElement(xmlDocument.Name.LocalName, xmlDocument.Elements().Select(RemoveAllNamespaces));
 }
 
-public record EventQueryResult
-{
-    public List<EventEntry> Events { get; init; } = new();
-    public bool HasMore { get; set; }
-    public int PageNumber { get; init; }
-    public bool HasPageSizeTruncated { get; set; }
-    public int PageSize { get; set; }
-}
