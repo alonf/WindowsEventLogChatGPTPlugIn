@@ -6,7 +6,6 @@ using Microsoft.OpenApi.Any;
 using Newtonsoft.Json;
 using WindowsEventLogChatGPTPlugIn;
 using System.Text.Json.Nodes;
-using System.Xml;
 using System.Xml.Linq;
 using Formatting = Newtonsoft.Json.Formatting;
 
