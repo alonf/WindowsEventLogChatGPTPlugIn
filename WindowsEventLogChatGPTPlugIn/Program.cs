@@ -136,7 +136,7 @@ app.MapGet("/events", (string logName, string query, int? pageSize, int? pageNum
             Name = "query",
             In = ParameterLocation.Query,
             Required = true,
-            Description = "valid XPath query for the Windows event log",
+            Description = "valid XPath query for the Windows event log. If the query contains time, it should be in 100 nanoseconds units",
             Schema = new OpenApiSchema { Type = "string" }
         });
         operation.Parameters.Add(new OpenApiParameter
